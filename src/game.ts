@@ -125,12 +125,18 @@ export class SnakeGame {
             head.x >= this.state.gridSize || 
             head.y >= this.state.gridSize
         ) {
-            this.state.gameOver = true;
-            return;
+            let wallHit = "";
+            if (head.x < 0) wallHit = "left";
+            else if (head.x >= this.state.gridSize) wallHit = "right";
+            else if (head.y < 0) wallHit = "top";
+            else if (head.y >= this.state.gridSize) wallHit = "bottom";
+            
+            throw new Error(`CRASH: Snake collided with ${wallHit} wall at position (${head.x}, ${head.y}) with score ${this.state.score}`);
         }
 
         // Check if the snake hit itself
-        if (this.state.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+        const collidingSegment = this.state.snake.find(segment => segment.x === head.x && segment.y === head.y);
+        if (collidingSegment) {
             this.state.gameOver = true;
             return;
         }
@@ -220,15 +226,23 @@ export class SnakeGame {
     private gameLoop(currentTime: number): void {
         if (this.gameLoopId === null) return;
 
-        window.requestAnimationFrame(this.gameLoop.bind(this));
+        // Set up the next animation frame first
+        this.gameLoopId = window.requestAnimationFrame(this.gameLoop.bind(this));
 
         const secondsSinceLastRender = (currentTime - this.lastRenderTime) / 1000;
         if (secondsSinceLastRender < 1 / this.gameSpeed) return;
 
         this.lastRenderTime = currentTime;
         
-        this.update();
-        this.render();
+        try {
+            this.update();
+            this.render();
+        } catch (error) {
+            // Stop the game loop if an error occurs
+            this.stop();
+            // Re-throw the error to be caught by the global error handler
+            throw error;
+        }
     }
 
     public start(): void {
