@@ -35,6 +35,8 @@ export class SnakeGame {
 
         this.setupEventListeners();
         this.updateScore();
+        
+        console.log(`Game initialized with grid size: ${this.state.gridSize}x${this.state.gridSize}`);
     }
 
     private generateFood(): Point {
@@ -50,9 +52,11 @@ export class SnakeGame {
         );
 
         if (isOnSnake) {
+            console.log('Food generated on snake, regenerating...');
             return this.generateFood();
         }
 
+        console.log(`New food generated at position: (${foodPosition.x}, ${foodPosition.y})`);
         return foodPosition;
     }
 
@@ -61,32 +65,40 @@ export class SnakeGame {
         if (scoreElement) {
             scoreElement.textContent = this.state.score.toString();
         }
+        console.log(`Score updated: ${this.state.score}`);
     }
 
     private setupEventListeners(): void {
         // Keyboard controls
         window.addEventListener('keydown', (e) => {
+            let newDirection = this.state.direction;
+            
             switch (e.key) {
                 case 'ArrowUp':
                     if (this.state.direction !== Direction.Down) {
-                        this.state.direction = Direction.Up;
+                        newDirection = Direction.Up;
                     }
                     break;
                 case 'ArrowDown':
                     if (this.state.direction !== Direction.Up) {
-                        this.state.direction = Direction.Down;
+                        newDirection = Direction.Down;
                     }
                     break;
                 case 'ArrowLeft':
                     if (this.state.direction !== Direction.Right) {
-                        this.state.direction = Direction.Left;
+                        newDirection = Direction.Left;
                     }
                     break;
                 case 'ArrowRight':
                     if (this.state.direction !== Direction.Left) {
-                        this.state.direction = Direction.Right;
+                        newDirection = Direction.Right;
                     }
                     break;
+            }
+            
+            if (newDirection !== this.state.direction) {
+                console.log(`Direction changed to: ${Direction[newDirection]}`);
+                this.state.direction = newDirection;
             }
         });
 
@@ -101,6 +113,7 @@ export class SnakeGame {
         if (this.state.gameOver) return;
 
         const head = { ...this.state.snake[0] };
+        const oldHead = { ...head };
 
         // Move the head based on the current direction
         switch (this.state.direction) {
@@ -131,12 +144,14 @@ export class SnakeGame {
             else if (head.y < 0) wallHit = "top";
             else if (head.y >= this.state.gridSize) wallHit = "bottom";
             
+            console.error(`Snake collided with ${wallHit} wall at position (${head.x}, ${head.y})`);
             throw new Error(`CRASH: Snake collided with ${wallHit} wall at position (${head.x}, ${head.y}) with score ${this.state.score}`);
         }
 
         // Check if the snake hit itself
         const collidingSegment = this.state.snake.find(segment => segment.x === head.x && segment.y === head.y);
         if (collidingSegment) {
+            console.warn(`Snake hit itself at position (${head.x}, ${head.y})`);
             this.state.gameOver = true;
             return;
         }
@@ -148,6 +163,7 @@ export class SnakeGame {
         if (head.x === this.state.food.x && head.y === this.state.food.y) {
             // Increase score
             this.state.score += 1;
+            console.log(`Snake ate food! New score: ${this.state.score}`);
             this.updateScore();
             
             // Generate new food
@@ -247,6 +263,7 @@ export class SnakeGame {
 
     public start(): void {
         if (this.gameLoopId === null) {
+            console.log('Game started');
             this.gameLoopId = window.requestAnimationFrame(this.gameLoop.bind(this));
         }
     }
@@ -255,6 +272,7 @@ export class SnakeGame {
         if (this.gameLoopId !== null) {
             window.cancelAnimationFrame(this.gameLoopId);
             this.gameLoopId = null;
+            console.log('Game stopped');
         }
     }
 
@@ -269,6 +287,7 @@ export class SnakeGame {
         };
         
         this.updateScore();
+        console.log('Game restarted');
         
         if (this.gameLoopId === null) {
             this.start();

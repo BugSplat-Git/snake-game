@@ -17,6 +17,59 @@ bugsplat.setDefaultAppKey('snake-game-key');
 bugsplat.setDefaultUser('player');
 bugsplat.setDefaultDescription('Snake Game Crash Report');
 
+// Console log capture - store the last 50 logs
+const consoleHistory = {
+    logs: [] as {type: string, args: any[], timestamp: string}[],
+    maxLogs: 50,
+    
+    add(type: string, args: any[]) {
+        this.logs.push({
+            type,
+            args: args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ),
+            timestamp: new Date().toISOString()
+        });
+        
+        // Keep only the last maxLogs entries
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+        }
+    },
+    
+    getAll() {
+        return this.logs;
+    },
+    
+    clear() {
+        this.logs = [];
+    },
+    
+    getAsFile() {
+        const logText = this.logs.map((log: {timestamp: string, type: string, args: string[]}) => 
+            `[${log.timestamp}] [${log.type}] ${log.args.join(' ')}`
+        ).join('\n');
+        
+        return new File([logText], 'ConsoleLogs.txt', { type: 'text/plain' });
+    }
+};
+
+// Monkey patch console methods
+(function() {
+    const methods = ['log', 'info', 'warn', 'error', 'debug'];
+    
+    methods.forEach(method => {
+        const originalMethod = console[method as keyof Console];
+        console[method as keyof Console] = function(...args: any[]) {
+            // Call the original method
+            originalMethod.apply(console, args);
+            
+            // Store in our history
+            consoleHistory.add(method, args);
+        } as any;
+    });
+})();
+
 // Global error handler with BugSplat integration
 window.addEventListener('error', async (event) => {
     console.error('CAPTURED ERROR EVENT:', event.error);
@@ -60,6 +113,9 @@ window.addEventListener('error', async (event) => {
         </crash>`
     const attributesFile = new File([attributes], 'CrashContext.xml', { type: 'text/xml' });
     
+    // Get console logs as a file
+    const consoleLogsFile = consoleHistory.getAsFile();
+    
     // Report the error to BugSplat
     await bugsplat.post(event.error, {
         description: `Snake game crash: ${event.error.message}`,
@@ -70,13 +126,21 @@ window.addEventListener('error', async (event) => {
                 value: attributesFile,
                 filename: 'CrashContext.xml',
             },
-            ...(screenshot ? [{
+            {
                 key: 'file1',
+                value: consoleLogsFile,
+                filename: 'ConsoleLogs.txt',
+            },
+            ...(screenshot ? [{
+                key: 'file2',
                 value: screenshot,
                 filename: 'GameScreenshot.png',
             }] : [])
         ]
     });
+    
+    // Clear console history after posting
+    consoleHistory.clear();
     
     return false; // Prevents the default browser error handling
 });
@@ -104,7 +168,22 @@ async function captureScreenshot(): Promise<File | null> {
 
 // Also handle unhandled promise rejections
 window.onunhandledrejection = async (rejection) => {
-    await bugsplat.post(rejection.reason);
+    // Get console logs as a file
+    const consoleLogsFile = consoleHistory.getAsFile();
+    
+    await bugsplat.post(rejection.reason, {
+        description: 'Unhandled promise rejection',
+        additionalFormDataParams: [
+            {
+                key: 'file0', 
+                value: consoleLogsFile,
+                filename: 'ConsoleLogs.txt',
+            }
+        ]
+    });
+    
+    // Clear console history after posting
+    consoleHistory.clear();
 };
 
 // Initialize game when DOM is fully loaded
