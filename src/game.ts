@@ -125,13 +125,8 @@ export class SnakeGame {
             head.x >= this.state.gridSize || 
             head.y >= this.state.gridSize
         ) {
-            let wallHit = "";
-            if (head.x < 0) wallHit = "left";
-            else if (head.x >= this.state.gridSize) wallHit = "right";
-            else if (head.y < 0) wallHit = "top";
-            else if (head.y >= this.state.gridSize) wallHit = "bottom";
-            
-            throw new Error(`CRASH: Snake collided with ${wallHit} wall at position (${head.x}, ${head.y}) with score ${this.state.score}`);
+            this.state.gameOver = true;
+            return;
         }
 
         // Check if the snake hit itself
